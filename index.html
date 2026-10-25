@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Generador de notación científica</title>
+<style>
+:root{
+  --bg:#f6f8fb;--card:#fff;--ink:#172033;--muted:#697386;--line:#dfe5ee;
+  --primary:#3056d3;--primary-dark:#2344ad;--soft:#eef3ff;
+  --good:#176b3a;--good-bg:#e8f7ee;--bad:#9d1c1c;--bad-bg:#fdecec;
+  --warn:#8a5a00;--warn-bg:#fff5da;--shadow:0 8px 24px rgba(31,45,61,.07)
+}
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color:var(--ink);background:radial-gradient(circle at 15% 0%,#eaf0ff 0,transparent 25rem),var(--bg)
+}
+button,input{font:inherit}
+main{max-width:1120px;margin:0 auto;padding:5px 14px 32px}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 5px}
+h1{font-size:clamp(1.2rem,2vw,1.55rem);line-height:1.05;letter-spacing:-.025em;margin:0;font-weight:800}
+.btn{
+  border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:11px;
+  padding:9px 13px;cursor:pointer;font-weight:750;transition:.15s ease
+}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(31,45,61,.08)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dark)}
+.panel{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);padding:13px;margin-top:6px
+}
+.level-tabs{display:grid;grid-template-columns:1fr 1fr minmax(180px,.62fr);gap:10px;margin-bottom:12px;align-items:stretch}
+.level-group{
+  border:1px solid var(--line);background:#f8faff;border-radius:12px;padding:9px 10px 10px;
+  display:flex;flex-direction:column;gap:7px
+}
+.level-group-title{
+  text-align:center;font-size:.83rem;font-weight:900;color:#33415c;line-height:1.2
+}
+.level-group-buttons{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.level-group .level-btn{flex:1 1 122px}
+.level-group.normalize .level-group-buttons{height:100%;align-items:center}
+.level-btn{
+  border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 11px;
+  font-weight:800;cursor:pointer;color:#3a465a
+}
+.level-btn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.exercise{
+  background:linear-gradient(135deg,#fbfcff,#f5f7ff);border:1px solid #dfe6fb;
+  border-radius:14px;padding:14px
+}
+.exercise-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:var(--primary)}
+.question{font-size:clamp(1.12rem,2.1vw,1.42rem);font-weight:700;margin:4px 0 10px;line-height:1.25}
+.level-note{color:var(--muted);font-size:.86rem;margin:-4px 0 10px;line-height:1.35}
+
+.notation-scroll{overflow-x:auto;padding:1px 0 4px;scrollbar-width:thin}
+.notation-table{
+  min-width:690px;width:100%;display:grid;
+  grid-template-columns:minmax(270px,1.55fr) 42px minmax(160px,.8fr) 82px minmax(82px,.42fr);
+  grid-template-rows:auto minmax(78px,auto);
+  border:1px solid #cfd8e8;border-radius:13px;overflow:hidden;background:#fff
+}
+.th{
+  background:#f1f4f9;color:#536076;font-size:.78rem;font-weight:850;text-transform:uppercase;
+  letter-spacing:.045em;padding:8px 10px;border-bottom:1px solid #dce3ee;display:flex;align-items:center;justify-content:center;text-align:center
+}
+.th.blank{color:transparent;user-select:none}
+.cell{
+  min-width:0;display:flex;align-items:center;justify-content:center;padding:11px 10px;
+  font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:clamp(1.65rem,3.5vw,2.7rem);font-weight:700;
+  font-variant-numeric:tabular-nums;white-space:nowrap
+}
+.cell+.cell,.th+.th{border-left:1px solid #e4e9f1}
+.operator{font-weight:500;color:#3e4b60}
+.ten-cell{gap:.08em}
+.ten-cell sup{font-size:.64em;vertical-align:super;line-height:0;margin-left:.02em}
+.fixed-value{width:100%;text-align:center;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
+.math-input{
+  width:100%;height:56px;border:1px solid #c5cfdd;border-radius:10px;background:#fff;
+  color:var(--ink);text-align:center;outline:0;padding:4px 8px;font-family:inherit;font-size:clamp(1.5rem,3vw,2.25rem);font-weight:750;
+  font-variant-numeric:tabular-nums
+}
+.math-input:focus{border-color:#8ea5ef;box-shadow:0 0 0 3px rgba(48,86,211,.13)}
+.math-input::placeholder{font-size:.9rem;color:#9aa5b5;font-weight:600}
+.exp-input{max-width:76px}
+/* Eleva visualmente el contenido de la celda del exponente para que se lea como superíndice de 10. */
+#exponentCell .math-input,
+#exponentCell .fixed-value{transform:translateY(-20px)}
+#exponentCell .math-input{height:42px}
+
+.answer-actions{
+  display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:10px;
+  overflow-x:auto;padding-bottom:2px
+}
+.answer-actions .btn{flex:0 0 auto}
+#newBtn{margin-left:120px}
+.feedback{display:none;margin-top:9px;padding:11px 13px;border-radius:11px;font-weight:750;line-height:1.4}
+.feedback.good{display:block;background:var(--good-bg);color:var(--good);border:1px solid #b7e4c7}
+.feedback.bad{display:block;background:var(--bad-bg);color:var(--bad);border:1px solid #f2b8b8}
+.feedback.warn{display:block;background:var(--warn-bg);color:var(--warn);border:1px solid #f0d28c}
+.hint,.solution{display:none;margin-top:11px;border-top:1px dashed var(--line);padding-top:12px}
+.hint.show,.solution.show{display:block}
+.hint-box{background:#fff8e8;border:1px solid #f1d795;border-radius:11px;padding:11px 12px;line-height:1.5}
+.solution h3{margin:0 0 8px}
+.step{display:grid;grid-template-columns:31px 1fr;gap:9px;margin:9px 0;align-items:start}
+.step-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--primary);font-weight:900}
+.math{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:1.09rem;line-height:1.75;overflow-wrap:anywhere}
+sup{font-size:.68em;vertical-align:super}
+.move{display:inline-block;padding:0 .16em;border-bottom:2px solid #8ea5ef}
+.tiny{font-size:.82rem;color:var(--muted);line-height:1.35;margin-top:5px}
+
+.stats{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
+.stats h2{margin:0 0 7px;font-size:1.02rem}
+.stats-lines{font-size:1.16rem;line-height:1.55;color:var(--ink)}
+.stats-lines b{color:var(--ink);font-size:1.16rem;font-weight:850}
+.percentage{
+  text-align:center;min-width:205px;padding:12px 15px;border-radius:12px;
+  border:1px solid transparent;transition:.15s ease
+}
+.percentage.low{background:var(--bad-bg);color:var(--bad);border-color:#f2b8b8}
+.percentage.high{background:var(--good-bg);color:var(--good);border-color:#b7e4c7}
+.percentage-value{font-size:1.16rem;font-weight:850;line-height:1.3}
+.percentage-label{font-size:1.16rem;font-weight:850;margin-top:2px;color:inherit}
+.secondary{margin-top:12px}
+.example{display:none;margin-top:9px;background:#f7f9fc;border:1px solid var(--line);padding:12px;border-radius:11px}
+.example.show{display:block}
+footer{margin-top:20px;color:var(--muted);font-size:.82rem;text-align:center}
+
+dialog{
+  border:0;padding:0;border-radius:16px;width:min(990px,96vw);max-height:94vh;
+  box-shadow:0 24px 80px rgba(0,0,0,.25);overflow:auto;background:#fff
+}
+dialog::backdrop{background:rgba(20,27,45,.52);backdrop-filter:blur(2px)}
+.help-wrap{padding:18px}
+.help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.help-head h2{margin:0;font-size:1.2rem}
+.help-rule{background:#f7f9fc;border:1px solid var(--line);border-radius:12px;padding:12px;margin:9px 0}
+.help-rule .formula{font-family:"Cambria Math",Georgia,serif;font-size:1.45rem;font-weight:750;text-align:center;margin:3px 0 7px}
+.help-image{
+  display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--line);
+  margin:2px 0 12px;background:#fff
+}
+.help-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.help-card{border:1px solid var(--line);border-radius:11px;padding:11px;background:#fff}
+.help-card b{display:block;margin-bottom:5px}
+
+@media(max-width:700px){
+  main{padding:4px 8px 28px}
+  .title-row{align-items:flex-start}
+  h1{font-size:1.18rem}
+  .title-row>.btn{padding:7px 9px}
+  .panel{padding:9px;border-radius:14px}
+  .exercise{padding:11px}
+  .level-tabs{grid-template-columns:1fr;gap:7px}
+  .level-group{padding:8px}
+  .level-group-buttons{gap:5px}
+  .level-btn{padding:7px 9px;font-size:.84rem}
+  .level-group .level-btn{flex:1 1 95px}
+  .answer-actions{gap:6px}
+  .answer-actions>.btn{width:auto;white-space:nowrap}
+  #newBtn{margin-left:70px}
+  .stats{grid-template-columns:1fr auto;gap:8px}
+  .percentage{min-width:150px;padding:10px 8px}
+  .stats-lines,.stats-lines b,.percentage-value,.percentage-label{font-size:.98rem}
+  .help-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<main>
+  <div class="title-row">
+    <h1>Generador de notación científica</h1>
+    <button class="btn" id="helpBtn">Ayuda</button>
+  </div>
+
+  <section class="panel">
+    <div class="level-tabs" role="tablist" aria-label="Nivel de práctica">
+      <div class="level-group">
+        <div class="level-group-title">Decimal → científica</div>
+        <div class="level-group-buttons">
+          <button class="level-btn active" data-level="1" title="Decimal mayor que 1 → notación científica">Mayor que 1</button>
+          <button class="level-btn" data-level="2" title="Decimal menor que 1 → notación científica">Menor que 1</button>
+          <button class="level-btn" data-level="3" title="50 % mayores que 1 y 50 % menores que 1 → notación científica">Mezclados</button>
+        </div>
+      </div>
+
+      <div class="level-group">
+        <div class="level-group-title">Científica → decimal</div>
+        <div class="level-group-buttons">
+          <button class="level-btn" data-level="4" title="Notación científica de un número menor que 1 → decimal">Menor que 1</button>
+          <button class="level-btn" data-level="5" title="Notación científica de un número mayor que 1 → decimal">Mayor que 1</button>
+          <button class="level-btn" data-level="6" title="50 % mayores que 1 y 50 % menores que 1 → decimal">Mezclados</button>
+        </div>
+      </div>
+
+      <div class="level-group normalize">
+        <div class="level-group-title">Casi científica → científica</div>
+        <div class="level-group-buttons">
+          <button class="level-btn" data-level="7" title="Normaliza una expresión con potencia de diez">Normalizar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="exercise">
+      <div class="exercise-label" id="exerciseLabel">Mayor que 1</div>
+      <div class="question" id="question">Pasa a notación científica:</div>
+      <div class="level-note" id="levelNote"></div>
+
+      <div class="notation-scroll">
+        <div class="notation-table" aria-label="Conversión entre notación decimal y notación científica">
+          <div class="th" id="firstHeader">Notación decimal</div>
+          <div class="th blank">=</div>
+          <div class="th">Coeficiente</div>
+          <div class="th blank">· 10</div>
+          <div class="th">Exponente</div>
+
+          <div class="cell" id="firstCell"></div>
+          <div class="cell operator">=</div>
+          <div class="cell" id="coefficientCell"></div>
+          <div class="cell operator ten-cell">· 10</div>
+          <div class="cell" id="exponentCell"></div>
+        </div>
+      </div>
+
+      <div class="answer-actions">
+        <button class="btn primary" id="checkBtn">Comprobar</button>
+        <button class="btn" id="hintBtn">Dame una pista</button>
+        <button class="btn" id="solutionBtn">Ver solución</button>
+        <button class="btn" id="newBtn">↻ Otro ejercicio</button>
+      </div>
+
+      <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+      <div id="hint" class="hint"></div>
+      <div id="solution" class="solution"></div>
+    </div>
+  </section>
+
+  <section class="panel stats">
+    <div>
+      <h2>Tu práctica de hoy</h2>
+      <div class="stats-lines">
+        <div>Aciertos al primer intento: <b id="firstHits">0</b></div>
+        <div>Aciertos totales: <b id="correctCount">0</b></div>
+        <div>Fallos: <b id="failCount">0</b></div>
+        <div>Intentos totales: <b id="attemptCount">0</b></div>
+      </div>
+    </div>
+    <div class="percentage low" id="percentageBox">
+      <div class="percentage-value" id="successPercent">0%</div>
+      <div class="percentage-label">porcentaje de aciertos</div>
+    </div>
+  </section>
+
+  <section class="secondary">
+    <button class="btn" id="exampleBtn">Ver un ejemplo resuelto</button>
+    <div class="example" id="example">
+      <div class="math">
+        <b>0,000456 → notación científica</b><br>
+        La primera cifra distinta de cero es el 4. Colocamos la coma detrás: <b>4,56</b>.<br>
+        Hemos movido la coma 4 lugares hacia la derecha, así que el exponente es negativo:<br>
+        <b>0,000456 = 4,56 · 10<sup>−4</sup></b>
+      </div>
+    </div>
+  </section>
+
+  <footer>El contador se reinicia al recargar la página.</footer>
+</main>
+
+<dialog id="helpDialog" aria-label="Ayuda sobre notación científica">
+  <div class="help-wrap">
+    <div class="help-head">
+      <h2>Ayuda · Notación científica</h2>
+      <button class="btn" id="closeHelp">Cerrar</button>
+    </div>
+
+    <img class="help-image" src="imagenes/ayuda_notacion_cientifica.png" alt="Resumen visual de cómo se escribe la notación científica, ejemplos correctos e incorrectos y conversiones entre notación decimal y científica">
+
+    <div class="help-rule">
+      <b>Para volver a notación decimal:</b> un exponente positivo desplaza la coma hacia la derecha; un exponente negativo, hacia la izquierda. El valor absoluto del exponente indica cuántos lugares hay que moverla.
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+"use strict";
+
+const $ = id => document.getElementById(id);
+const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+const chance = p => Math.random()<p;
+
+let level=1;
+let current=null;
+let firstTryHits=0;
+let correctAttempts=0;
+let totalAttempts=0;
+
+const firstCell=$("firstCell"), coefficientCell=$("coefficientCell"), exponentCell=$("exponentCell");
+const firstHeader=$("firstHeader"), question=$("question"), levelNote=$("levelNote"), exerciseLabel=$("exerciseLabel");
+const feedback=$("feedback"), hint=$("hint"), solution=$("solution");
+
+function toComma(s){ return String(s).replace(".",","); }
+function minus(n){ return String(n).replace("-","−"); }
+function sciHTML(coef,exp){ return `${toComma(coef)} · 10<sup>${minus(exp)}</sup>`; }
+
+function randomDigits(){
+  const count=rand(1,5);
+  let s=String(rand(1,9));
+  for(let i=1;i<count;i++){
+    if(i===count-1) s+=String(rand(1,9));
+    else s+=String(rand(0,9));
+  }
+  return s;
+}
+
+function coefficientFromDigits(digits){
+  return digits.length===1 ? digits : digits[0]+"."+digits.slice(1);
+}
+
+function decimalFromDigits(digits,exp){
+  const pos=1+exp;
+  let out;
+  if(pos<=0) out="0."+"0".repeat(-pos)+digits;
+  else if(pos>=digits.length) out=digits+"0".repeat(pos-digits.length);
+  else out=digits.slice(0,pos)+"."+digits.slice(pos);
+  return out;
+}
+
+function shiftCoefficientRight(coef,places){
+  const digits=coef.replace(".","");
+  const pos=1+places;
+  if(pos>=digits.length) return digits+"0".repeat(pos-digits.length);
+  return digits.slice(0,pos)+"."+digits.slice(pos);
+}
+
+function baseProblem(exp){
+  const digits=randomDigits();
+  const coefficient=coefficientFromDigits(digits);
+  const decimal=decimalFromDigits(digits,exp);
+  return {digits,coefficient,exp,decimal,attempts:0,solutionSeen:false,solved:false};
+}
+
+function generateProblem(){
+  let p;
+  if(level===1){
+    p=baseProblem(rand(1,10)); p.mode="toSci";
+  }else if(level===2){
+    p=baseProblem(-rand(1,10)); p.mode="toSci";
+  }else if(level===3){
+    p=baseProblem(chance(.5)?rand(1,10):-rand(1,10)); p.mode="toSci";
+  }else if(level===4){
+    p=baseProblem(-rand(1,10)); p.mode="toDecimal";
+  }else if(level===5){
+    p=baseProblem(rand(1,10)); p.mode="toDecimal";
+  }else if(level===6){
+    p=baseProblem(chance(.5)?rand(1,10):-rand(1,10)); p.mode="toDecimal";
+  }else{
+    p=baseProblem(rand(-8,10));
+    const shift=rand(1,3);
+    p.mode="normalize";
+    p.shift=shift;
+    p.givenCoefficient=shiftCoefficientRight(p.coefficient,shift);
+    p.givenExp=p.exp-shift;
+  }
+  return p;
+}
+
+function inputHTML(id,kind,placeholder,extra=""){
+  const mode=kind==="int"?"numeric":"decimal";
+  return `<input id="${id}" class="math-input ${extra}" inputmode="${mode}" autocomplete="off" placeholder="${placeholder}" aria-label="${placeholder}">`;
+}
+
+function fixedHTML(content){ return `<div class="fixed-value">${content}</div>`; }
+
+function renderProblem(){
+  feedback.className="feedback"; feedback.innerHTML="";
+  hint.className="hint"; hint.innerHTML="";
+  solution.className="solution"; solution.innerHTML="";
+  $("hintBtn").textContent="Dame una pista";
+  $("solutionBtn").textContent="Ver solución";
+
+  const exerciseLabels={1:"Mayor que 1",2:"Menor que 1",3:"Mezclados",4:"Menor que 1",5:"Mayor que 1",6:"Mezclados",7:"Normalizar"};
+  exerciseLabel.textContent=exerciseLabels[level];
+  firstHeader.textContent=level===7?"Número dado":"Notación decimal";
+
+  const notes={
+    1:"El número decimal siempre es mayor que 1.",
+    2:"El número decimal siempre es menor que 1.",
+    3:"Aproximadamente la mitad de los ejercicios son mayores que 1 y la otra mitad menores que 1.",
+    4:"La expresión en notación científica representa un número menor que 1.",
+    5:"La expresión en notación científica representa un número mayor que 1.",
+    6:"Aproximadamente la mitad de los ejercicios son mayores que 1 y la otra mitad menores que 1.",
+    7:"El coeficiente dado no está normalizado: conviértelo en un número entre 1 y 10 y ajusta el exponente."
+  };
+  levelNote.textContent=notes[level];
+
+  if(current.mode==="toSci"){
+    question.textContent="Pasa a notación científica:";
+    firstCell.innerHTML=fixedHTML(toComma(current.decimal));
+    coefficientCell.innerHTML=inputHTML("coefInput","decimal","coeficiente");
+    exponentCell.innerHTML=inputHTML("expInput","int","n","exp-input");
+  }else if(current.mode==="toDecimal"){
+    question.textContent="Pasa a notación decimal:";
+    firstCell.innerHTML=inputHTML("decimalInput","decimal","escribe el número");
+    coefficientCell.innerHTML=fixedHTML(toComma(current.coefficient));
+    exponentCell.innerHTML=fixedHTML(`<sup>${minus(current.exp)}</sup>`);
+  }else{
+    question.textContent="Escribe la expresión en notación científica correcta:";
+    firstCell.innerHTML=fixedHTML(sciHTML(current.givenCoefficient,current.givenExp));
+    coefficientCell.innerHTML=inputHTML("coefInput","decimal","coeficiente");
+    exponentCell.innerHTML=inputHTML("expInput","int","n","exp-input");
+  }
+
+  const focusId=current.mode==="toDecimal"?"decimalInput":"coefInput";
+  setTimeout(()=>$(focusId)?.focus(),0);
+  document.querySelectorAll(".math-input").forEach(el=>el.addEventListener("keydown",e=>{if(e.key==="Enter")check();}));
+}
+
+function newExercise(){
+  current=generateProblem();
+  renderProblem();
+}
+
+function parseDecimal(raw){
+  const s=String(raw??"").trim().replace(/\s/g,"").replace(",",".");
+  if(!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s)) return NaN;
+  return Number(s);
+}
+
+function parseInteger(raw){
+  const s=String(raw??"").trim().replace(/−/g,"-");
+  if(!/^-?\d+$/.test(s)) return NaN;
+  return Number(s);
+}
+
+function nearlyEqual(a,b){
+  return Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=Math.max(1e-14,Math.abs(b)*1e-10);
+}
+
+function validScientificCoefficient(x){ return Number.isFinite(x)&&x>=1&&x<10; }
+
+function correctAnswerHTML(){
+  if(current.mode==="toDecimal") return `<b>${toComma(current.decimal)}</b>`;
+  return `<b>${sciHTML(current.coefficient,current.exp)}</b>`;
+}
+
+function check(){
+  if(current.solved){
+    feedback.className="feedback good";
+    feedback.innerHTML=`😊 <b>Este ejercicio ya está correcto.</b> Pulsa «Otro ejercicio» para continuar.`;
+    return;
+  }
+
+  let ok=false;
+  let formatProblem="";
+
+  if(current.mode==="toDecimal"){
+    const user=parseDecimal($("decimalInput").value);
+    if(!Number.isFinite(user)) formatProblem="Escribe el resultado en notación decimal, sin usar potencias de diez.";
+    else ok=nearlyEqual(user,Number(current.decimal));
+  }else{
+    const coef=parseDecimal($("coefInput").value);
+    const exp=parseInteger($("expInput").value);
+    if(!Number.isFinite(coef)||!Number.isFinite(exp)){
+      formatProblem="Completa el coeficiente y el exponente con números válidos.";
+    }else if(!validScientificCoefficient(coef)){
+      formatProblem="El coeficiente de una notación científica debe ser mayor o igual que 1 y menor que 10.";
+    }else{
+      ok=nearlyEqual(coef,Number(current.coefficient)) && exp===current.exp;
+    }
+  }
+
+  if(formatProblem){
+    feedback.className="feedback warn";
+    feedback.textContent=formatProblem;
+    return;
+  }
+
+  current.attempts++;
+  totalAttempts++;
+
+  if(ok){
+    const counts=!current.solutionSeen;
+    current.solved=true;
+    if(counts){
+      correctAttempts++;
+      if(current.attempts===1) firstTryHits++;
+    }
+    feedback.className="feedback good";
+    feedback.innerHTML=counts
+      ? `😊 <b>¡Correcto!</b> ${correctAnswerHTML()}`
+      : `😊 <b>¡Correcto!</b> ${correctAnswerHTML()} Como habías visto la solución, este acierto no cuenta en tus estadísticas.`;
+  }else{
+    feedback.className="feedback bad";
+    if(current.mode==="toDecimal"){
+      feedback.innerHTML=`😟 <b>No es correcto.</b> Revisa hacia qué lado debes mover la coma y cuántos lugares indica el exponente.`;
+    }else if(current.mode==="normalize"){
+      feedback.innerHTML=`😟 <b>No es correcto.</b> El coeficiente final debe quedar entre 1 y 10 y el exponente debe compensar el movimiento de la coma.`;
+    }else{
+      feedback.innerHTML=`😟 <b>No es correcto.</b> Revisa dónde colocas la coma y el signo del exponente.`;
+    }
+  }
+  updateScore();
+}
+
+function updateScore(){
+  const failures=totalAttempts-correctAttempts;
+  $("firstHits").textContent=String(firstTryHits);
+  $("correctCount").textContent=String(correctAttempts);
+  $("failCount").textContent=String(failures);
+  $("attemptCount").textContent=String(totalAttempts);
+  const pct=totalAttempts===0?0:Math.round(correctAttempts/totalAttempts*100);
+  $("successPercent").textContent=`${pct}%`;
+  $("percentageBox").classList.toggle("low",pct<50);
+  $("percentageBox").classList.toggle("high",pct>=50);
+}
+
+function hintHTML(){
+  if(current.mode==="toSci"){
+    if(current.exp>0){
+      return `<div class="hint-box"><b>Pista:</b> coloca la coma justo después de la primera cifra. Como el número inicial es mayor que 1, el exponente será <b>positivo</b>. Cuenta los lugares que has desplazado la coma hacia la izquierda.</div>`;
+    }
+    return `<div class="hint-box"><b>Pista:</b> busca la primera cifra distinta de cero y coloca la coma detrás. Como el número inicial es menor que 1, el exponente será <b>negativo</b>. Cuenta los lugares que has desplazado la coma hacia la derecha.</div>`;
+  }
+  if(current.mode==="toDecimal"){
+    const dir=current.exp>0?"derecha":"izquierda";
+    return `<div class="hint-box"><b>Pista:</b> el exponente es ${minus(current.exp)}. Mueve la coma <b>${Math.abs(current.exp)} ${Math.abs(current.exp)===1?"lugar":"lugares"} hacia la ${dir}</b>. Añade ceros si es necesario.</div>`;
+  }
+  return `<div class="hint-box"><b>Pista:</b> el coeficiente ${toComma(current.givenCoefficient)} es demasiado grande para estar en notación científica. Mueve su coma hacia la izquierda hasta dejar una sola cifra delante. Por cada lugar que muevas la coma a la izquierda, <b>aumenta el exponente en 1</b>.</div>`;
+}
+
+function showHint(){
+  if(hint.classList.contains("show")){
+    hint.className="hint";
+    $("hintBtn").textContent="Dame una pista";
+    return;
+  }
+  hint.innerHTML=hintHTML();
+  hint.className="hint show";
+  $("hintBtn").textContent="Ocultar pista";
+}
+
+function solutionHTML(){
+  if(current.mode==="toSci"){
+    const moves=Math.abs(current.exp);
+    const dir=current.exp>0?"izquierda":"derecha";
+    const signText=current.exp>0?"positivo":"negativo";
+    return `<h3>Solución paso a paso</h3>
+      <div class="step"><div class="step-num">1</div><div><b>Partimos del número:</b><div class="math">${toComma(current.decimal)}</div></div></div>
+      <div class="step"><div class="step-num">2</div><div><b>Colocamos la coma para que quede una sola cifra distinta de cero delante:</b><div class="math">${toComma(current.coefficient)}</div></div></div>
+      <div class="step"><div class="step-num">3</div><div>La coma se ha movido <b>${moves} ${moves===1?"lugar":"lugares"} hacia la ${dir}</b>. Por eso el exponente es <b>${signText}</b>: <span class="math">${minus(current.exp)}</span>.</div></div>
+      <div class="step"><div class="step-num">4</div><div><b>Resultado:</b><div class="math"><b>${sciHTML(current.coefficient,current.exp)}</b></div></div></div>`;
+  }
+  if(current.mode==="toDecimal"){
+    const moves=Math.abs(current.exp);
+    const dir=current.exp>0?"derecha":"izquierda";
+    return `<h3>Solución paso a paso</h3>
+      <div class="step"><div class="step-num">1</div><div><b>Partimos de:</b><div class="math">${sciHTML(current.coefficient,current.exp)}</div></div></div>
+      <div class="step"><div class="step-num">2</div><div>El exponente ${minus(current.exp)} indica que debemos mover la coma <b>${moves} ${moves===1?"lugar":"lugares"} hacia la ${dir}</b>.</div></div>
+      <div class="step"><div class="step-num">3</div><div><b>Resultado en notación decimal:</b><div class="math"><b>${toComma(current.decimal)}</b></div></div></div>`;
+  }
+  return `<h3>Solución paso a paso</h3>
+    <div class="step"><div class="step-num">1</div><div><b>Partimos de:</b><div class="math">${sciHTML(current.givenCoefficient,current.givenExp)}</div></div></div>
+    <div class="step"><div class="step-num">2</div><div>Para que el coeficiente quede entre 1 y 10 movemos la coma <b>${current.shift} ${current.shift===1?"lugar":"lugares"} hacia la izquierda</b>:<div class="math">${toComma(current.givenCoefficient)} → ${toComma(current.coefficient)}</div></div></div>
+    <div class="step"><div class="step-num">3</div><div>Ese movimiento multiplica el coeficiente por una potencia de diez menor, así que compensamos <b>sumando ${current.shift}</b> al exponente:<div class="math">${minus(current.givenExp)} + ${current.shift} = ${minus(current.exp)}</div></div></div>
+    <div class="step"><div class="step-num">4</div><div><b>Resultado:</b><div class="math"><b>${sciHTML(current.coefficient,current.exp)}</b></div></div></div>`;
+}
+
+function showSolution(){
+  if(solution.classList.contains("show")){
+    solution.className="solution";
+    $("solutionBtn").textContent="Ver solución";
+    return;
+  }
+  current.solutionSeen=true;
+  solution.innerHTML=solutionHTML();
+  solution.className="solution show";
+  $("solutionBtn").textContent="Ocultar solución";
+}
+
+document.querySelectorAll(".level-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".level-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    level=Number(btn.dataset.level);
+    newExercise();
+  });
+});
+
+$("checkBtn").addEventListener("click",check);
+$("hintBtn").addEventListener("click",showHint);
+$("newBtn").addEventListener("click",newExercise);
+$("solutionBtn").addEventListener("click",showSolution);
+
+$("exampleBtn").addEventListener("click",()=>{
+  $("example").classList.toggle("show");
+  $("exampleBtn").textContent=$("example").classList.contains("show")?"Ocultar ejemplo":"Ver un ejemplo resuelto";
+});
+
+const help=$("helpDialog");
+$("helpBtn").addEventListener("click",()=>help.showModal());
+$("closeHelp").addEventListener("click",()=>help.close());
+help.addEventListener("click",e=>{
+  const r=help.getBoundingClientRect();
+  if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) help.close();
+});
+
+newExercise();
+})();
+</script>
+</body>
+</html>

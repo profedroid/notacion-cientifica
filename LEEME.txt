@@ -1,0 +1,7 @@
+Generador de notación científica - versión 2
+
+Contenido:
+- index.html
+- imagenes/ayuda_notacion_cientifica.png
+
+Abre index.html en un navegador. Si lo publicas en GitHub Pages, sube la carpeta imagenes junto con index.html para que la ayuda visual se muestre correctamente.
